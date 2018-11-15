@@ -17,7 +17,6 @@ for i in range (500):
     env.render()
     n = env.n
     action = [rd.random(5) for k in range(n)]
-    action = [action[i] / np.sum(action[i]) for i in range(n)]
     env.step(action)
     
     
