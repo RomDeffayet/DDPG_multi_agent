@@ -4,7 +4,10 @@ Created on Tue Nov 13 11:04:15 2018
 
 @author: Romain Deffayet
 """
-from torch.autograd import Variable
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 class Critic_Model(nn.Module):
     def __init__(self, state_space_size, action_space_size):
@@ -12,11 +15,13 @@ class Critic_Model(nn.Module):
         self.h1 = nn.Linear(state_space_size, 50)
         self.h2 = nn.Linear(50,1)
         self.W1 = nn.Parameter(nn.init.normal_(torch.empty(50,50)))
-        self.W2 = nn.Parameter(nn.init.normal_(torch.empty(action_space_size, 50)))
+        self.W2 = nn.Parameter(nn.init.normal_(torch.empty(50, action_space_size)))
         self.b = nn.Parameter(nn.init.normal_(torch.empty(1,50)))
 
-    def forward(self, s, a):  
-        x = F.relu(torch.mm(self.h1(s), self.W1) + torch.mm(a, self.W2) + self.b)
+    def forward(self, s, a):
+        in1 = torch.mv(self.W1, self.h1(s))
+        in2 = torch.mv(self.W2, a)
+        x = F.relu( in1 + in2 + self.b)
         x = self.h2(x)
         return x
 
@@ -25,8 +30,8 @@ class Critic_Model(nn.Module):
 class Actor:
     def __init__(self, state_space_size, n_actions, learning_rate = 0.001):
         
-        self.eval_actions = self.buildNetwork(self, state_space_size, n_actions)
-        self.target_actions = self.buildNetwork(self, state_space_size, n_actions)
+        self.eval_actions = self.buildNetwork(state_space_size, n_actions)
+        self.target_actions = self.buildNetwork(state_space_size, n_actions)
         
         self.optimizer = torch.optim.Adam(self.eval_actions.parameters(), learning_rate)
         
@@ -49,18 +54,23 @@ class Actor:
         
         
     def forwardPass(self,state):
-        return self.eval_actions(state)        
+        tensor_state = torch.tensor(state, dtype = torch.float)
+        return self.eval_actions(tensor_state)        
         
         
-    def learn(self, minibatch, alpha = 0.001 , tau = 0.01):
-        s,a,r,sp = minibatch
-        s = Variable(torch.from_numpy(s))
-        a = Variable(torch.from_numpy(a)) 
-        
-        ###Optimizing
-        pred_actions = self.forwardPass(self, s)
-        loss = -1 * torch.sum(self.critic.forwardPass(s, pred_actions))
-        self.optimizer.no_grad()
+    def learn(self, minibatch, i, alpha = 0.001 , tau = 0.01):
+        pred_Q = torch.zeros(len(minibatch))
+        for j in range(len(minibatch)):
+            [s,a,r,sp] = minibatch[j]
+            s = torch.tensor(s[i], dtype = torch.float)
+            a = torch.tensor(a[i], dtype = torch.float) 
+            
+            ###Optimizing
+            pred_action = self.forwardPass(s)
+            pred_Q[j] = self.critic.eval_Q(s, pred_action)
+            
+        loss = -1 * torch.sum(pred_Q[j])
+        self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
         
@@ -74,8 +84,8 @@ class Actor:
     
 class Critic:
     def __init__(self, state_space_size, action_space_size, actor, learning_rate = 0.001):
-        self.eval_Q = self.buildNetwork(self, state_space_size, action_space_size)
-        self.target_Q = self.buildNetwork(self, state_space_size, action_space_size)
+        self.eval_Q = self.buildNetwork(state_space_size, action_space_size)
+        self.target_Q = self.buildNetwork(state_space_size, action_space_size)
         
         self.actor = actor
         self.actor.setCritic(self)
@@ -92,21 +102,24 @@ class Critic:
         return Critic_Model(state_space_size, action_space_size)
         
         
-    def learn(self, minibatch, gamma = .9, tau = 0.01):
-        s,a,r,sp = minibatch
-        s = Variable(torch.from_numpy(s))
-        a = Variable(torch.from_numpy(a))
-        r = Variable(torch.from_numpy(r))
-        sp = Variable(torch.from_numpy(sp))
-        
-        ### Computing loss
-        a_pred = self.actor.target_actions(sp)
-        y_pred = r + gamma * self.target_Q(sp, a_pred)
-        y_eval = self.eval_Q(s,a)
+    def learn(self, minibatch, i, gamma = .9, tau = 0.01):
+        y_pred, y_eval = torch.zeros(len(minibatch)), torch.zeros(len(minibatch))
+        for j in range(len(minibatch)):
+            [s,a,r,sp] = minibatch[j]
+            s = torch.tensor(s[i], dtype = torch.float)
+            a = torch.tensor(a[i], dtype = torch.float)
+            r = r[i]
+            sp = torch.tensor(sp[i], dtype = torch.float)
+            
+            ### Computing loss
+            a_pred = self.actor.target_actions(sp)
+            y_pred[j] = r + gamma * self.target_Q(sp, a_pred)
+            y_eval[j] = self.eval_Q(s,a)
+            
         loss = F.mse_loss(y_pred, y_eval)
         
         ### Optimizing
-        self.optimizer.no_grad()
+        self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
