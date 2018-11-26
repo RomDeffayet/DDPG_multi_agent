@@ -33,7 +33,7 @@ Here we plot the length of episodes as training goes on :
 
 ## License
 
-This project is under the MIT License - see the [LICENSE](LICENSE;txt) file for details
+This project is under the MIT License - see the [LICENSE](LICENSE.txt) file for details.
 
 ## Acknowledgements
 
