@@ -11,7 +11,7 @@ Use the following command with the desired ``NUMBER_OF_EPISODES`` to lauch the f
 python episode.py --n_episodes NUMBER_OF_EPISODES
 ```
 
-Further 
+Further hyperparameter tuning can be done by passing arguments listed in ``episode.py``.
 
 
 ### Prerequisites
