@@ -66,7 +66,7 @@ def episode(n_episodes, buffer_size, N, learn, render, x0, mu, sigma, theta, dt,
         step_count = 0
         done = np.array([False] * 4)
         
-        while (not any(done)):
+        while (not any(done) and step_count < 1000):
             if render:
                 env.render()
             
@@ -107,7 +107,7 @@ def episode(n_episodes, buffer_size, N, learn, render, x0, mu, sigma, theta, dt,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', default='simple_tag_guided', type=str) 
-    parser.add_argument('--n_episodes', default=1000, type=int)
+    parser.add_argument('--n_episodes', default=5000, type=int)
     parser.add_argument ('--learn', default=True, type=bool)
     parser.add_argument ('--render', default=False, type=bool)
     parser.add_argument ('--buffer_size', default=1000, type=int)
